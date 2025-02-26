@@ -41,6 +41,10 @@ mv temp/packages/utils/coremark package/new/coremark
 mv temp/immortalwrt/package/emortal/default-settings package/new/default-settings
 
 
+# config file
+cp ../config/360t7.config .config
+make defconfig
+
 rm -rf temp
 
 # # 编译固件
