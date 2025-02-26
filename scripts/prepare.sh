@@ -18,7 +18,7 @@ mv temp/luci/applications/luci-app-vlmcsd package/new/luci-app-vlmcsd
 mv temp/packages/net/vlmcsd package/new/vlmcsd
 # edit package/new/luci-app-vlmcsd/Makefile
 sed -i 's/..\/..\/luci.mk/$(TOPDIR)\/feeds\/luci\/luci.mk/g' package/new/luci-app-vlmcsd/Makefile
-sed -i 's/Vlmcsd KMS 服务器/KMS激活/g' package/new/luci-app-vlmcsd/po/zh_Hans/vlmcsd.po
+sed -i 's/Vlmcsd KMS 服务器/KMS服务器/g' package/new/luci-app-vlmcsd/po/zh_Hans/vlmcsd.po
 
 ## MOSDNS
 # remove v2ray-geodata package from feeds (openwrt-22.03 & master)
