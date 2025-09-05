@@ -1,4 +1,4 @@
-git clone https://github.com/openwrt/openwrt.git --depth 1 --single-branch -b v24.10.0
+git clone https://github.com/openwrt/openwrt.git --depth 1 --single-branch -b v24.10.2
 cd openwrt
 
 # 更新 Feeds
