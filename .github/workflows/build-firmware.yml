@@ -50,7 +50,8 @@ jobs:
     - name: Get Architecture
       working-directory: ${{ github.workspace }}/openwrt
       run: |
-        tag_name=$(curl --silent "https://api.github.com/repos/openwrt/openwrt/releases/latest" | jq -r .tag_name)
+        tag_name=$(curl -s https://api.github.com/repos/padavanonly/immortalwrt-mt798x-6.6/commits | grep '"sha":' | head -n 1 | awk -F '"' '{print $4}')
+        tag_name=${tag_name:0:7}
         echo "tag_name=${tag_name}" >>$GITHUB_ENV
     - name: Make Download
       run: |
@@ -81,7 +82,7 @@ jobs:
       run: |
         rm -rf ./artifact/
         mkdir -p ./artifact/
-        mv openwrt/bin/targets/mediatek/filogic/openwrt* ./artifact/
+        mv openwrt/bin/targets/mediatek/filogic/*wrt* ./artifact/
         mv openwrt/bin/targets/mediatek/filogic/config.buildinfo ./artifact/
         cd ./artifact/
         ls -Ahl
