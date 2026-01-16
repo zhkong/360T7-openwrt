@@ -328,18 +328,24 @@ setup_terminal_tools() {
         echo "    ✓ 使用默认配置"
     fi
     
-    # 设置 zsh 为默认 shell 的脚本
+    # 设置 zsh 为默认 shell
+    echo "  设置默认 shell 为 zsh..."
+    
+    # 创建首次启动脚本，在首次启动时设置默认 shell
     cat > "$FILES_DIR/usr/libexec/uci-defaults/99-set-default-shell-zsh" << 'UCIEOF'
 #!/bin/sh
 # 设置 root 用户默认 shell 为 zsh
 if [ -x /usr/bin/zsh ]; then
-    if grep -q "root:.*:/bin/ash" /etc/passwd; then
+    # 检查当前 shell 是否为 ash，如果是则改为 zsh
+    if grep -q "root:.*:/bin/ash" /etc/passwd 2>/dev/null; then
         sed -i 's|root:\([^:]*\):\([^:]*\):\([^:]*\):\([^:]*\):\([^:]*\):/bin/ash|root:\1:\2:\3:\4:\5:/usr/bin/zsh|' /etc/passwd
         echo "Default shell changed to zsh"
     fi
 fi
+exit 0
 UCIEOF
     chmod +x "$FILES_DIR/usr/libexec/uci-defaults/99-set-default-shell-zsh"
+    echo "    ✓ 已创建 uci-defaults 脚本，将在首次启动时设置 zsh 为默认 shell"
     
     # 创建 .profile
     cat > "$FILES_DIR/root/.profile" << 'PROFILE'
