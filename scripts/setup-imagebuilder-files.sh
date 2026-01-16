@@ -183,7 +183,7 @@ EOF
 # ==================== LuCI 轮询间隔设置 ====================
 setup_poll_interval() {
     echo ""
-    echo "[2/4] 设置 LuCI 轮询间隔..."
+    echo "[2/5] 设置 LuCI 轮询间隔..."
     
     local poll_interval="${POLL_INTERVAL:-1}"
     local uci_dir="$FILES_DIR/etc/uci-defaults"
@@ -201,10 +201,64 @@ EOF
     echo "  ✓ 轮询间隔设置 (${poll_interval}秒)"
 }
 
+# ==================== 硬件流量卸载配置 ====================
+setup_flow_offloading() {
+    echo ""
+    echo "[3/5] 配置硬件流量卸载 (Hardware Flow Offloading)..."
+    
+    local uci_dir="$FILES_DIR/etc/uci-defaults"
+    mkdir -p "$uci_dir"
+    
+    # 创建 UCI defaults 脚本，确保在首次启动时设置硬件流量卸载
+    # 使用更可靠的方法：先检查并创建 defaults 段，然后设置选项
+    cat > "$uci_dir/99-enable-flow-offloading" << 'UCIEOF'
+#!/bin/sh
+# 启用 Hardware Flow Offloading，不修改其他 firewall 配置
+# 此脚本在首次启动时执行，确保硬件流量卸载被启用
+
+# 检查 firewall 配置是否存在
+if [ ! -f /etc/config/firewall ]; then
+    exit 0
+fi
+
+# 检查 defaults 配置段是否存在，如果不存在则创建
+if ! uci get firewall.@defaults[0] >/dev/null 2>&1; then
+    uci add firewall defaults
+fi
+
+# 设置 flow offloading 相关选项
+uci set firewall.@defaults[0].flow_offloading='1' 2>/dev/null || true
+uci set firewall.@defaults[0].flow_offloading_hw='1' 2>/dev/null || true
+
+# 提交配置
+uci commit firewall 2>/dev/null || true
+
+# 验证配置是否设置成功
+FLOW_OFFLOAD=$(uci get firewall.@defaults[0].flow_offloading 2>/dev/null || echo "")
+FLOW_OFFLOAD_HW=$(uci get firewall.@defaults[0].flow_offloading_hw 2>/dev/null || echo "")
+
+if [ "$FLOW_OFFLOAD" = "1" ] && [ "$FLOW_OFFLOAD_HW" = "1" ]; then
+    echo "Hardware Flow Offloading 已启用"
+else
+    echo "警告: Hardware Flow Offloading 配置可能未生效 (flow_offloading=$FLOW_OFFLOAD, flow_offloading_hw=$FLOW_OFFLOAD_HW)"
+fi
+
+# 如果 firewall 服务已启动，重新加载配置以应用更改
+if [ -f /etc/init.d/firewall ] && /etc/init.d/firewall enabled; then
+    /etc/init.d/firewall reload 2>/dev/null || true
+fi
+UCIEOF
+    chmod +x "$uci_dir/99-enable-flow-offloading"
+    
+    echo "  ✓ UCI defaults 脚本已创建"
+    echo "  ✓ 将自动启用 flow_offloading='1' 和 flow_offloading_hw='1'"
+    echo "  ✓ 包含配置验证和错误处理"
+}
+
 # ==================== 终端工具配置 ====================
 setup_terminal_tools() {
     echo ""
-    echo "[3/4] 配置终端工具 (Zsh + Oh-My-Zsh)..."
+    echo "[4/5] 配置终端工具 (Zsh + Oh-My-Zsh)..."
     
     mkdir -p "$FILES_DIR/root"
     mkdir -p "$FILES_DIR/etc/profile.d"
@@ -327,7 +381,7 @@ ZSHRC
 # ==================== 显示摘要 ====================
 show_summary() {
     echo ""
-    echo "[4/4] 清理和统计..."
+    echo "[5/5] 清理和统计..."
     
     local total_size=$(du -sh "$FILES_DIR" 2>/dev/null | cut -f1)
     local file_count=$(find "$FILES_DIR" -type f | wc -l)
@@ -343,6 +397,7 @@ show_summary() {
     echo "包含功能:"
     echo "  ✓ CPU 状态显示 (温度 + 使用率)"
     echo "  ✓ LuCI 轮询间隔 (${POLL_INTERVAL:-1}秒)"
+    echo "  ✓ 硬件流量卸载 (Hardware Flow Offloading)"
     echo "  ✓ Zsh 默认 Shell"
     echo "  ✓ Oh-My-Zsh + Agnoster 主题"
     echo "  ✓ Zsh 插件 (autosuggestions, syntax-highlighting, completions)"
@@ -354,6 +409,7 @@ show_summary() {
 main() {
     setup_cpu_status
     setup_poll_interval
+    setup_flow_offloading
     setup_terminal_tools
     show_summary
 }
