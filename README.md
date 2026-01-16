@@ -1,7 +1,7 @@
 # 360T7 OpenWrt 固件项目
 
 [![360T7 OpenWRT ImageBuilder Build](https://github.com/zhkong/360T7-openwrt/actions/workflows/build-imagebuilder.yml/badge.svg)](https://github.com/zhkong/360T7-openwrt/actions/workflows/build-imagebuilder.yml)
-[![360T7 OpenWRT Build](https://github.com/zhkong/360T7-openwrt/actions/workflows/build-firmware.yml/badge.svg)](https://github.com/zhkong/360T7-openwrt/actions/workflows/build-firmware.yml)
+<!-- [![360T7 OpenWRT Build](https://github.com/zhkong/360T7-openwrt/actions/workflows/build-firmware.yml/badge.svg)](https://github.com/zhkong/360T7-openwrt/actions/workflows/build-firmware.yml) -->
 
 本项目为 **奇虎360 T7 路由器** 提供自动化的 OpenWrt 固件编译方案。支持两种构建方式：**ImageBuilder 快速构建**和**完整源码编译**。
 
