@@ -37,6 +37,9 @@ cd openwrt
 cd ..
 bash scripts/setup-cpu-status.sh
 bash scripts/setup-poll-interval.sh
+
+# 配置终端工具（zsh + oh-my-zsh）
+bash scripts/preset-terminal-tools.sh openwrt
 cd openwrt
 
 # config file
