@@ -213,6 +213,10 @@ build_firmware() {
     # 复制到项目输出目录
     mkdir -p "$PROJECT_DIR/output"
     cp -v "$imagebuilder_dir/bin/targets/$TARGET/$SUBTARGET/"*"$PROFILE"* "$PROJECT_DIR/output/" 2>/dev/null || true
+    # 复制 sha256sums 文件（如果存在）
+    if [ -f "$imagebuilder_dir/bin/targets/$TARGET/$SUBTARGET/sha256sums" ]; then
+        cp -v "$imagebuilder_dir/bin/targets/$TARGET/$SUBTARGET/sha256sums" "$PROJECT_DIR/output/" 2>/dev/null || true
+    fi
     
     echo ""
     echo "固件已复制到: $PROJECT_DIR/output/"

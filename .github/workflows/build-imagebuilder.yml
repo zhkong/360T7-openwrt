@@ -112,13 +112,38 @@ jobs:
       run: df -h
     - name: Organize files
       id: organize
+      env:
+        OPENWRT_VERSION_SHORT: ${{ env.OPENWRT_VERSION_SHORT }}
       run: |
         rm -rf ./artifact/
         mkdir -p ./artifact/
         if [ -d "./output" ] && [ -n "$(ls -A ./output 2>/dev/null)" ]; then
-          cp -v ./output/* ./artifact/ 2>/dev/null || true
+          cd ./output/
+          # 重命名文件，去掉 openwrt-{version}-custom-mediatek-filogic- 前缀
+          prefix="openwrt-${OPENWRT_VERSION_SHORT}-custom-mediatek-filogic-"
+          for file in *; do
+            if [ -f "$file" ]; then
+              # 去掉前缀
+              if [[ "$file" == "${prefix}"* ]]; then
+                new_name="${file#${prefix}}"
+                mv -v "$file" "../artifact/$new_name"
+              else
+                cp -v "$file" "../artifact/"
+              fi
+            fi
+          done
+          cd ..
         fi
         cd ./artifact/
+        # 如果存在 sha256sums 文件，更新其中的文件名引用（去掉前缀）
+        if [ -f "sha256sums" ]; then
+          echo "更新 sha256sums 文件中的文件名引用..."
+          prefix="openwrt-${OPENWRT_VERSION_SHORT}-custom-mediatek-filogic-"
+          # 去掉文件名中的前缀
+          sed -i "s|${prefix}||g" sha256sums
+          echo "已更新 sha256sums 文件："
+          cat sha256sums
+        fi
         echo "已包含的文件："
         ls -Ahl
     - name: Upload artifact
