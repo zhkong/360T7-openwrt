@@ -76,16 +76,66 @@ download_imagebuilder() {
     
     # 解压
     local extract_dir="openwrt-imagebuilder-${version}-${TARGET}-${SUBTARGET}.Linux-x86_64"
-    if [ ! -d "$extract_dir" ]; then
+    
+    # 检查目录是否存在且完整（验证 Makefile 是否存在）
+    local need_extract=true
+    if [ -d "$extract_dir" ] && [ -f "$extract_dir/Makefile" ]; then
+        echo "ImageBuilder 目录已存在且完整，跳过解压" >&2
+        need_extract=false
+    elif [ -d "$extract_dir" ]; then
+        echo "警告: ImageBuilder 目录存在但不完整（缺少 Makefile），将重新解压..." >&2
+        rm -rf "$extract_dir"
+    fi
+    
+    if [ "$need_extract" = true ]; then
         echo "解压 ImageBuilder..." >&2
         if [[ "$filename" == *.zst ]]; then
-            tar --use-compress-program=unzstd -xf "$filename"
+            if ! tar --use-compress-program=unzstd -xf "$filename"; then
+                echo "错误: 解压失败" >&2
+                exit 1
+            fi
         else
-            tar -xf "$filename"
+            if ! tar -xf "$filename"; then
+                echo "错误: 解压失败" >&2
+                exit 1
+            fi
         fi
     fi
     
-    echo "$BUILD_DIR/$extract_dir"
+    # 检查解压后的目录
+    if [ ! -d "$extract_dir" ]; then
+        echo "错误: 解压后未找到目录: $extract_dir" >&2
+        echo "当前目录: $(pwd)" >&2
+        echo "目录内容:" >&2
+        ls -la >&2
+        exit 1
+    fi
+    
+    # 验证关键文件是否存在
+    if [ ! -f "$extract_dir/Makefile" ]; then
+        echo "错误: 解压后的目录中未找到 Makefile，解压可能不完整" >&2
+        echo "目录内容:" >&2
+        ls -la "$extract_dir" | head -20 >&2
+        exit 1
+    fi
+    
+    echo "ImageBuilder 解压完成，Makefile 验证通过" >&2
+    
+    # 返回绝对路径
+    local abs_path="$BUILD_DIR/$extract_dir"
+    if [ -d "$abs_path" ]; then
+        # 使用 realpath 或 cd+pwd 获取绝对路径
+        if command -v realpath &> /dev/null; then
+            abs_path=$(realpath "$abs_path")
+        else
+            abs_path=$(cd "$abs_path" && pwd)
+        fi
+    else
+        echo "错误: ImageBuilder 目录不存在: $abs_path" >&2
+        exit 1
+    fi
+    
+    echo "$abs_path"
 }
 
 # ==================== 构建固件 ====================
@@ -99,7 +149,37 @@ build_firmware() {
     echo "版本: $version"
     echo "=========================================="
     
-    cd "$imagebuilder_dir"
+    # 检查 ImageBuilder 目录是否存在
+    if [ ! -d "$imagebuilder_dir" ]; then
+        echo "错误: ImageBuilder 目录不存在: $imagebuilder_dir" >&2
+        exit 1
+    fi
+    
+    echo "ImageBuilder 目录: $imagebuilder_dir"
+    echo "当前工作目录: $(pwd)"
+    echo ""
+    
+    # 切换到 ImageBuilder 目录
+    cd "$imagebuilder_dir" || {
+        echo "错误: 无法切换到 ImageBuilder 目录: $imagebuilder_dir" >&2
+        exit 1
+    }
+    
+    echo "切换后的工作目录: $(pwd)"
+    echo "目录内容:"
+    ls -la | head -20
+    echo ""
+    
+    # 检查 Makefile 是否存在
+    if [ ! -f "Makefile" ]; then
+        echo "错误: 在 ImageBuilder 目录中找不到 Makefile" >&2
+        echo "当前目录内容:" >&2
+        ls -la >&2
+        exit 1
+    fi
+    
+    echo "Makefile 存在，继续构建..."
+    echo ""
     
     # 获取软件包列表
     local packages=$(get_all_packages)
@@ -108,6 +188,12 @@ build_firmware() {
     echo ""
     
     # 构建命令
+    echo "执行构建命令..."
+    echo "PROFILE=$PROFILE"
+    echo "PACKAGES=$packages"
+    echo "FILES=$FILES_DIR"
+    echo ""
+    
     make image \
         PROFILE="$PROFILE" \
         PACKAGES="$packages" \
