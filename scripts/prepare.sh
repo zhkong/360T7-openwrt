@@ -33,6 +33,11 @@ cd openwrt
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 
+# 添加 CPU 状态显示到 LuCI 首页
+cd ..
+bash scripts/setup-cpu-status.sh
+cd openwrt
+
 # config file
 # 使用 360t7.config 作为配置文件
 cp ../config/360t7.config .config
