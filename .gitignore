@@ -51,4 +51,36 @@ Temporary Items
 
 # End of https://www.toptal.com/developers/gitignore/api/linux,macos
 
-openwrt
+### OpenWrt Build ###
+# OpenWrt source code directory
+openwrt/
+
+# Build output directory
+output/
+artifact/
+
+# ImageBuilder downloads and extracted files
+imagebuilder/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# Build artifacts
+*.bin
+*.img
+*.itb
+*.fip
+*.tar.gz
+*.ipk
+sha256sums
+config.buildinfo
+*.manifest
+*.json
+*.cdx.json
+
+# Log files
+*.log
