@@ -1,16 +1,27 @@
-name: X86 OpenWRT Build
+name: 360T7 OpenWRT Build
 
 on:
-#  schedule:
-#    - cron: 5 6 * * 0
+  schedule:
+    # 每天检查一次 OpenWrt 是否有新 release
+    - cron: '0 */6 * * *'
   push:
   watch:
     types: started
+  workflow_dispatch:
+    inputs:
+      openwrt_version:
+        description: 'OpenWrt 版本/标签 (例如: v24.10.5, 留空则使用最新 release)'
+        required: false
+        type: string
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-    if: github.event.repository.owner.id == github.event.sender.id
+    # 对于 schedule 和 workflow_dispatch 事件，不检查 sender
+    if: |
+      github.event_name == 'schedule' || 
+      github.event_name == 'workflow_dispatch' || 
+      github.event.repository.owner.id == github.event.sender.id
 
     steps:
     - name: Show system
@@ -44,20 +55,68 @@ jobs:
         sudo -E git config --global user.name 'GitHub Actions' && git config --global user.email 'noreply@github.com'
         sudo -E git config --global core.abbrev auto
         df -h
+    - name: Check OpenWrt Release
+      id: check_release
+      run: |
+        # 检查是否手动指定了版本（仅在 workflow_dispatch 事件中可用）
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.openwrt_version }}" ]; then
+          # 使用手动指定的版本
+          OPENWRT_VERSION="${{ inputs.openwrt_version }}"
+          OPENWRT_TAG="${{ inputs.openwrt_version }}"
+          echo "使用手动指定的 OpenWrt 版本: $OPENWRT_VERSION"
+        else
+          # 获取最新的 release 标签
+          echo "正在检查 OpenWrt 最新 release..."
+          OPENWRT_VERSION=$(curl -s https://api.github.com/repos/openwrt/openwrt/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | head -n 1)
+          if [ -z "$OPENWRT_VERSION" ]; then
+            # 如果没有 release，尝试获取最新的标签
+            echo "未找到 release，尝试获取最新标签..."
+            OPENWRT_VERSION=$(curl -s https://api.github.com/repos/openwrt/openwrt/git/refs/tags | grep -o '"refs/tags/[^"]*"' | tail -n 1 | sed 's/"refs\/tags\///;s/"//')
+          fi
+          if [ -z "$OPENWRT_VERSION" ]; then
+            # 如果还是获取不到，使用 master 分支
+            OPENWRT_VERSION="master"
+            echo "未找到标签，使用 master 分支"
+          fi
+          OPENWRT_TAG="$OPENWRT_VERSION"
+        fi
+        
+        # 获取版本号的短格式（用于命名）
+        if [[ "$OPENWRT_VERSION" == v* ]]; then
+          OPENWRT_VERSION_SHORT="${OPENWRT_VERSION#v}"
+        else
+          OPENWRT_VERSION_SHORT="$OPENWRT_VERSION"
+        fi
+        
+        echo "OPENWRT_VERSION=$OPENWRT_VERSION" >> $GITHUB_ENV
+        echo "OPENWRT_TAG=$OPENWRT_TAG" >> $GITHUB_ENV
+        echo "OPENWRT_VERSION_SHORT=$OPENWRT_VERSION_SHORT" >> $GITHUB_ENV
+        
+        # 保存到文件，供 prepare.sh 使用
+        echo "$OPENWRT_TAG" > /tmp/openwrt_tag.txt
+        echo "检测到 OpenWrt 版本: $OPENWRT_VERSION"
+        echo "版本短格式: $OPENWRT_VERSION_SHORT"
     - name: prepare
       run: |
         bash ./scripts/prepare.sh
     - name: Get Architecture
       working-directory: ${{ github.workspace }}/openwrt
       run: |
-        tag_name=$(curl -s https://api.github.com/repos/padavanonly/immortalwrt-mt798x-6.6/commits | grep '"sha":' | head -n 1 | awk -F '"' '{print $4}')
-        tag_name=${tag_name:0:7}
+        # 获取当前 OpenWrt 仓库的 commit SHA
+        tag_name=$(git rev-parse --short HEAD)
         echo "tag_name=${tag_name}" >>$GITHUB_ENV
     - name: Make Download
       run: |
         cd openwrt
         make download -j50
     - name: Make Defconfig
+      run: |
+        cd openwrt
+        make defconfig
+    - name: Setup Chinese Locale
+      run: |
+        bash ../scripts/setup-chinese-locale.sh openwrt
+    - name: Make Defconfig (after locale setup)
       run: |
         cd openwrt
         make defconfig
@@ -89,16 +148,16 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@main
       with:
-        name: OpenWRT_${{ env.tag_name }}
+        name: OpenWRT_${{ env.OPENWRT_VERSION_SHORT }}_${{ env.tag_name }}
         path: ./artifact/
 
     - name: Create release
       id: create_release
       uses: ncipollo/release-action@v1.14.0
       with:
-        name: ${{ env.tag_name }}
+        name: OpenWrt-${{ env.OPENWRT_VERSION_SHORT }}-${{ env.tag_name }}
         allowUpdates: true
-        tag: ${{ env.tag_name }}
+        tag: openwrt-${{ env.OPENWRT_VERSION_SHORT }}-${{ env.tag_name }}
         replacesArtifacts: true
         token: ${{ secrets.GITHUB_TOKEN }}
         artifacts: ./artifact/*
