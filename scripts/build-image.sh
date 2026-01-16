@@ -27,7 +27,7 @@ get_openwrt_version() {
         version=$(cat /tmp/openwrt_tag.txt)
     else
         # 获取最新的稳定版本
-        echo "正在获取最新 OpenWrt 版本..."
+        echo "正在获取最新 OpenWrt 版本..." >&2
         version=$(curl -s https://api.github.com/repos/openwrt/openwrt/releases/latest | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/' | head -n 1)
         
         if [ -z "$version" ]; then
@@ -38,7 +38,7 @@ get_openwrt_version() {
         # 最终备用
         if [ -z "$version" ]; then
             version="24.10.0"
-            echo "警告: 无法获取最新版本，使用默认版本 $version"
+            echo "警告: 无法获取最新版本，使用默认版本 $version" >&2
         fi
     fi
     
@@ -56,10 +56,10 @@ download_imagebuilder() {
     mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
     
-    echo "=========================================="
-    echo "下载 OpenWrt ImageBuilder ${version}..."
-    echo "URL: $url"
-    echo "=========================================="
+    echo "==========================================" >&2
+    echo "下载 OpenWrt ImageBuilder ${version}..." >&2
+    echo "URL: $url" >&2
+    echo "==========================================" >&2
     
     if [ ! -f "$filename" ]; then
         # 尝试下载
@@ -67,17 +67,17 @@ download_imagebuilder() {
             # 如果 .zst 不存在，尝试 .tar.xz
             url="https://downloads.openwrt.org/releases/${version}/targets/${TARGET}/${SUBTARGET}/openwrt-imagebuilder-${version}-${TARGET}-${SUBTARGET}.Linux-x86_64.tar.xz"
             filename="openwrt-imagebuilder-${version}-${TARGET}-${SUBTARGET}.Linux-x86_64.tar.xz"
-            echo "尝试备用格式: $url"
+            echo "尝试备用格式: $url" >&2
             curl -L -o "$filename" "$url"
         fi
     else
-        echo "ImageBuilder 已存在，跳过下载"
+        echo "ImageBuilder 已存在，跳过下载" >&2
     fi
     
     # 解压
     local extract_dir="openwrt-imagebuilder-${version}-${TARGET}-${SUBTARGET}.Linux-x86_64"
     if [ ! -d "$extract_dir" ]; then
-        echo "解压 ImageBuilder..."
+        echo "解压 ImageBuilder..." >&2
         if [[ "$filename" == *.zst ]]; then
             tar --use-compress-program=unzstd -xf "$filename"
         else
