@@ -36,6 +36,7 @@ cd openwrt
 # 添加 CPU 状态显示到 LuCI 首页
 cd ..
 bash scripts/setup-cpu-status.sh
+bash scripts/setup-poll-interval.sh
 cd openwrt
 
 # config file

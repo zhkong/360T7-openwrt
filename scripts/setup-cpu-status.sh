@@ -159,4 +159,20 @@ return baseclass.extend({
 EOF
 
 echo "✓ CPU 状态模块已创建：$LUCI_STATUS_DIR/15_cpuinfo.js"
-echo "完成！CPU 温度和使用率将显示在 LuCI 首页。"
+
+# 创建 uci-defaults 脚本，设置轮询间隔为 1 秒
+UCI_DEFAULTS_DIR="openwrt/files/etc/uci-defaults"
+mkdir -p "$UCI_DEFAULTS_DIR"
+
+cat > "$UCI_DEFAULTS_DIR/99-luci-poll-interval" << 'EOF'
+#!/bin/sh
+# 设置 LuCI 状态页面轮询间隔为 1 秒
+uci set luci.main.pollinterval=1
+uci commit luci
+exit 0
+EOF
+
+chmod +x "$UCI_DEFAULTS_DIR/99-luci-poll-interval"
+echo "✓ 轮询间隔设置已创建：$UCI_DEFAULTS_DIR/99-luci-poll-interval (1秒)"
+
+echo "完成！CPU 温度和使用率将显示在 LuCI 首页，刷新间隔为 1 秒。"
