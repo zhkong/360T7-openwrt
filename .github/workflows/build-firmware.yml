@@ -144,9 +144,20 @@ jobs:
       run: |
         rm -rf ./artifact/
         mkdir -p ./artifact/
-        mv openwrt/bin/targets/mediatek/filogic/*wrt* ./artifact/
-        mv openwrt/bin/targets/mediatek/filogic/config.buildinfo ./artifact/
+        BUILD_DIR="openwrt/bin/targets/mediatek/filogic"
+        # 移动固件镜像文件 (*wrt*)
+        if ls ${BUILD_DIR}/*wrt* 1> /dev/null 2>&1; then
+          mv ${BUILD_DIR}/*wrt* ./artifact/ 2>/dev/null || true
+        fi
+        # 移动 rootfs 文件 (*rootfs*.tar.gz)
+        if ls ${BUILD_DIR}/*rootfs*.tar.gz 1> /dev/null 2>&1; then
+          mv ${BUILD_DIR}/*rootfs*.tar.gz ./artifact/ 2>/dev/null || true
+        fi
+        # 移动其他可能需要的文件
+        [ -f ${BUILD_DIR}/config.buildinfo ] && mv ${BUILD_DIR}/config.buildinfo ./artifact/ 2>/dev/null || true
+        [ -f ${BUILD_DIR}/sha256sums ] && mv ${BUILD_DIR}/sha256sums ./artifact/ 2>/dev/null || true
         cd ./artifact/
+        echo "已包含的文件："
         ls -Ahl
     - name: Upload artifact
       uses: actions/upload-artifact@main
