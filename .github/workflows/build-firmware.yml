@@ -1,10 +1,6 @@
 name: 360T7 OpenWRT Build
 
 on:
-  schedule:
-    # 每天检查一次 OpenWrt 是否有新 release
-    - cron: '0 */6 * * *'
-  push:
   workflow_dispatch:
     inputs:
       openwrt_version:
@@ -15,9 +11,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    # 对于 schedule 和 workflow_dispatch 事件，不检查 sender
+    # 对于 workflow_dispatch 事件，不检查 sender
     if: |
-      github.event_name == 'schedule' || 
       github.event_name == 'workflow_dispatch' || 
       github.event.repository.owner.id == github.event.sender.id
 
