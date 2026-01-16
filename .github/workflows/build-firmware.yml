@@ -5,8 +5,6 @@ on:
     # 每天检查一次 OpenWrt 是否有新 release
     - cron: '0 */6 * * *'
   push:
-  watch:
-    types: started
   workflow_dispatch:
     inputs:
       openwrt_version:
