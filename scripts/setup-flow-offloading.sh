@@ -15,11 +15,12 @@ cd "$OPENWRT_DIR"
 echo "正在配置 Hardware Flow Offloading..."
 
 # 创建文件系统目录结构
-mkdir -p files/usr/libexec/uci-defaults
+# 注意: UCI defaults 脚本必须放在 /etc/uci-defaults/ 目录
+mkdir -p files/etc/uci-defaults
 
 # 创建 UCI 默认配置脚本来只启用 Hardware Flow Offloading
 # 这个脚本会在首次启动时运行，只修改 flow offloading 相关设置
-cat > files/usr/libexec/uci-defaults/99-enable-flow-offloading <<'UCIEOF'
+cat > files/etc/uci-defaults/99-enable-flow-offloading <<'UCIEOF'
 #!/bin/sh
 # 只启用 Hardware Flow Offloading，不修改其他 firewall 配置
 
@@ -45,7 +46,7 @@ if [ -f /etc/init.d/firewall ] && /etc/init.d/firewall enabled; then
 fi
 UCIEOF
 
-chmod +x files/usr/libexec/uci-defaults/99-enable-flow-offloading
+chmod +x files/etc/uci-defaults/99-enable-flow-offloading
 
 echo "Hardware Flow Offloading 配置完成！"
 echo "- 已创建 UCI defaults 脚本"
