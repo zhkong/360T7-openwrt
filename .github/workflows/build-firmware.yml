@@ -115,10 +115,10 @@ jobs:
         make defconfig
     - name: Setup Chinese Locale
       run: |
-        bash ../scripts/setup-chinese-locale.sh openwrt
+        bash ./scripts/setup-chinese-locale.sh openwrt
     - name: Setup Flow Offloading
       run: |
-        bash ../scripts/setup-flow-offloading.sh openwrt
+        bash ./scripts/setup-flow-offloading.sh openwrt
     - name: Make Defconfig (after setup)
       run: |
         cd openwrt
