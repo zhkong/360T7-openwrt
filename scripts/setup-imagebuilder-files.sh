@@ -50,7 +50,7 @@ function progressbar(value, max) {
 
 	return E('div', {
 		'class': 'cbi-progressbar',
-		'title': '%d%% (%d / %d)'.format(pc, vn, mn)
+		'title': '%d%%'.format(pc)
 	}, E('div', { 'style': 'width:%.2f%%'.format(pc) }));
 }
 
@@ -124,13 +124,13 @@ return baseclass.extend({
 
 		// CPU 使用率
 		if (cpuUsage !== null) {
-			fields.push(_('CPU usage (%)'));
+			fields.push('CPU 使用率 (%)');
 			fields.push(progressbar(cpuUsage, 100));
 		}
 
 		// CPU 温度
 		if (cpuTemp !== null) {
-			fields.push(_('Temperature'));
+			fields.push('温度');
 			fields.push(cpuTemp + ' °C');
 		}
 
