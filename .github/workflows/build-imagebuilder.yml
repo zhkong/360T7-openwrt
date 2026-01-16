@@ -1,0 +1,139 @@
+name: 360T7 OpenWRT ImageBuilder Build
+
+on:
+  schedule:
+    # 每6小时检查一次 OpenWrt 是否有新 release
+    - cron: '0 */6 * * *'
+  push:
+  workflow_dispatch:
+    inputs:
+      openwrt_version:
+        description: 'OpenWrt 版本/标签 (例如: 24.10.5, 留空则使用最新 release)'
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    # 对于 schedule 和 workflow_dispatch 事件，不检查 sender
+    if: |
+      github.event_name == 'schedule' || 
+      github.event_name == 'workflow_dispatch' || 
+      github.event.repository.owner.id == github.event.sender.id
+
+    steps:
+    - name: Show system
+      run: |
+        echo -e "Total CPU cores\t: $(nproc)"
+        cat /proc/cpuinfo | grep 'model name'
+    - name: Maximize build space
+      uses: easimon/maximize-build-space@master
+      with:
+        swap-size-mb: 1024
+        temp-reserve-mb: 512
+        root-reserve-mb: 4608
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+        remove-codeql: 'true'
+    - name: Checkout
+      uses: actions/checkout@main
+    - name: Install dependencies
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo -E apt-get -qq update
+        sudo -E apt-get -y -qq install curl tar zstd git make
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        df -h
+    - name: Check OpenWrt Release
+      id: check_release
+      run: |
+        # 检查是否手动指定了版本（仅在 workflow_dispatch 事件中可用）
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.openwrt_version }}" ]; then
+          # 使用手动指定的版本
+          OPENWRT_VERSION="${{ inputs.openwrt_version }}"
+          OPENWRT_TAG="${{ inputs.openwrt_version }}"
+          echo "使用手动指定的 OpenWrt 版本: $OPENWRT_VERSION"
+        else
+          # 获取最新的 release 标签
+          echo "正在检查 OpenWrt 最新 release..."
+          OPENWRT_VERSION=$(curl -s https://api.github.com/repos/openwrt/openwrt/releases/latest | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/' | head -n 1)
+          if [ -z "$OPENWRT_VERSION" ]; then
+            # 如果没有 release，尝试从下载页面获取
+            OPENWRT_VERSION=$(curl -s https://downloads.openwrt.org/releases/ | grep -oP 'href="\K[0-9]+\.[0-9]+\.[0-9]+(?=/")' | sort -V | tail -n 1)
+          fi
+          if [ -z "$OPENWRT_VERSION" ]; then
+            # 如果还是获取不到，使用默认版本
+            OPENWRT_VERSION="24.10.5"
+            echo "未找到最新版本，使用默认版本: $OPENWRT_VERSION"
+          fi
+          OPENWRT_TAG="$OPENWRT_VERSION"
+        fi
+        
+        # 获取版本号的短格式（用于命名）
+        if [[ "$OPENWRT_VERSION" == v* ]]; then
+          OPENWRT_VERSION_SHORT="${OPENWRT_VERSION#v}"
+        else
+          OPENWRT_VERSION_SHORT="$OPENWRT_VERSION"
+        fi
+        
+        echo "OPENWRT_VERSION=$OPENWRT_VERSION" >> $GITHUB_ENV
+        echo "OPENWRT_TAG=$OPENWRT_TAG" >> $GITHUB_ENV
+        echo "OPENWRT_VERSION_SHORT=$OPENWRT_VERSION_SHORT" >> $GITHUB_ENV
+        
+        # 保存到文件，供 build-image.sh 使用
+        echo "$OPENWRT_TAG" > /tmp/openwrt_tag.txt
+        echo "检测到 OpenWrt 版本: $OPENWRT_VERSION"
+        echo "版本短格式: $OPENWRT_VERSION_SHORT"
+    - name: Build firmware with ImageBuilder
+      run: |
+        bash ./scripts/build-image.sh
+    - name: Get build info
+      id: build_info
+      run: |
+        # 获取构建时间戳
+        BUILD_TIME=$(date +%Y%m%d-%H%M%S)
+        echo "build_time=${BUILD_TIME}" >> $GITHUB_OUTPUT
+        
+        # 获取固件文件信息
+        if [ -d "./output" ] && [ -n "$(ls -A ./output 2>/dev/null)" ]; then
+          FIRMWARE_FILE=$(ls -1 ./output/*.bin ./output/*.img* 2>/dev/null | head -n 1)
+          if [ -n "$FIRMWARE_FILE" ]; then
+            FIRMWARE_NAME=$(basename "$FIRMWARE_FILE")
+            FIRMWARE_SIZE=$(du -h "$FIRMWARE_FILE" | cut -f1)
+            echo "firmware_name=${FIRMWARE_NAME}" >> $GITHUB_OUTPUT
+            echo "firmware_size=${FIRMWARE_SIZE}" >> $GITHUB_OUTPUT
+            echo "固件文件: $FIRMWARE_NAME ($FIRMWARE_SIZE)"
+          fi
+        fi
+    - name: Print Disk Space After
+      run: df -h
+    - name: Organize files
+      id: organize
+      run: |
+        rm -rf ./artifact/
+        mkdir -p ./artifact/
+        if [ -d "./output" ] && [ -n "$(ls -A ./output 2>/dev/null)" ]; then
+          cp -v ./output/* ./artifact/ 2>/dev/null || true
+        fi
+        cd ./artifact/
+        echo "已包含的文件："
+        ls -Ahl
+    - name: Upload artifact
+      uses: actions/upload-artifact@main
+      with:
+        name: OpenWRT-ImageBuilder-${{ env.OPENWRT_VERSION_SHORT }}-${{ steps.build_info.outputs.build_time }}
+        path: ./artifact/
+
+    - name: Create release
+      id: create_release
+      uses: ncipollo/release-action@v1.14.0
+      with:
+        name: OpenWrt-ImageBuilder-${{ env.OPENWRT_VERSION_SHORT }}-${{ steps.build_info.outputs.build_time }}
+        allowUpdates: true
+        tag: openwrt-imagebuilder-${{ env.OPENWRT_VERSION_SHORT }}-${{ steps.build_info.outputs.build_time }}
+        replacesArtifacts: true
+        token: ${{ secrets.GITHUB_TOKEN }}
+        artifacts: ./artifact/*
