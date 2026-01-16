@@ -255,10 +255,34 @@ UCIEOF
     echo "  ✓ 包含配置验证和错误处理"
 }
 
+# ==================== ttyd Web 终端配置 ====================
+setup_ttyd() {
+    echo ""
+    echo "[3/5] 配置 ttyd Web 终端..."
+
+    local config_dir="$FILES_DIR/etc/config"
+    mkdir -p "$config_dir"
+
+    cat > "$config_dir/ttyd" << 'EOF'
+config ttyd
+	option enable '1'
+	option port '7681'
+	option interface '@lan'
+	option command '/bin/login'
+	option terminal_type 'xterm-256color'
+	option check_origin '0'
+	option max_clients '10'
+EOF
+    echo "  ✓ ttyd 配置文件已创建"
+    echo "  ✓ 默认端口: 7681"
+    echo "  ✓ 终端类型: xterm-256color"
+    echo "  ✓ 最大客户端数: 10"
+}
+
 # ==================== 终端工具配置 ====================
 setup_terminal_tools() {
     echo ""
-    echo "[4/5] 配置终端工具 (Zsh + Oh-My-Zsh)..."
+    echo "[5/5] 配置终端工具 (Zsh + Oh-My-Zsh)..."
     
     mkdir -p "$FILES_DIR/root"
     mkdir -p "$FILES_DIR/etc/profile.d"
@@ -398,6 +422,7 @@ show_summary() {
     echo "  ✓ CPU 状态显示 (温度 + 使用率)"
     echo "  ✓ LuCI 轮询间隔 (${POLL_INTERVAL:-1}秒)"
     echo "  ✓ 硬件流量卸载 (Hardware Flow Offloading)"
+    echo "  ✓ ttyd Web 终端 (端口 7681)"
     echo "  ✓ Zsh 默认 Shell"
     echo "  ✓ Oh-My-Zsh + Agnoster 主题"
     echo "  ✓ Zsh 插件 (autosuggestions, syntax-highlighting, completions)"
@@ -410,6 +435,7 @@ main() {
     setup_cpu_status
     setup_poll_interval
     setup_flow_offloading
+    setup_ttyd
     setup_terminal_tools
     show_summary
 }
