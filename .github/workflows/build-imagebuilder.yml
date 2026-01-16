@@ -131,7 +131,7 @@ jobs:
       id: create_release
       uses: ncipollo/release-action@v1.14.0
       with:
-        name: OpenWrt-ImageBuilder-${{ env.OPENWRT_VERSION_SHORT }}-${{ steps.build_info.outputs.build_time }}
+        name: ImageBuilder ${{ env.OPENWRT_VERSION_SHORT }}
         allowUpdates: true
         tag: openwrt-imagebuilder-${{ env.OPENWRT_VERSION_SHORT }}-${{ steps.build_info.outputs.build_time }}
         replacesArtifacts: true

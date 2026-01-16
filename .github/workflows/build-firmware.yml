@@ -162,7 +162,7 @@ jobs:
       id: create_release
       uses: ncipollo/release-action@v1.14.0
       with:
-        name: OpenWrt-${{ env.OPENWRT_VERSION_SHORT }}-${{ env.tag_name }}
+        name: Firmware ${{ env.OPENWRT_VERSION_SHORT }}
         allowUpdates: true
         tag: openwrt-${{ env.OPENWRT_VERSION_SHORT }}-${{ env.tag_name }}
         replacesArtifacts: true
