@@ -49,15 +49,19 @@ jobs:
         df -h
     - name: Check OpenWrt Release
       id: check_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         # 检查是否手动指定了版本（仅在 workflow_dispatch 事件中可用）
+        FORCE_BUILD=false
         if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.openwrt_version }}" ]; then
-          # 使用手动指定的版本
+          # 使用手动指定的版本，强制构建
           OPENWRT_VERSION="${{ inputs.openwrt_version }}"
           OPENWRT_TAG="${{ inputs.openwrt_version }}"
-          echo "使用手动指定的 OpenWrt 版本: $OPENWRT_VERSION"
+          FORCE_BUILD=true
+          echo "使用手动指定的 OpenWrt 版本: $OPENWRT_VERSION，强制构建"
         else
-          # 获取最新的 release 标签
+          # 获取上游 OpenWrt 最新的 release 标签
           echo "正在检查 OpenWrt 最新 release..."
           OPENWRT_VERSION=$(curl -s https://api.github.com/repos/openwrt/openwrt/releases/latest | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/' | head -n 1)
           if [ -z "$OPENWRT_VERSION" ]; then
@@ -79,18 +83,79 @@ jobs:
           OPENWRT_VERSION_SHORT="$OPENWRT_VERSION"
         fi
         
+        echo "上游 OpenWrt 版本: $OPENWRT_VERSION_SHORT"
+        
+        # 获取当前仓库的最新 release 版本（用于比较）
+        NEED_BUILD=true
+        if [ "$FORCE_BUILD" != "true" ]; then
+          echo "正在检查当前仓库的最新 release..."
+          LATEST_RELEASE_JSON=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest")
+          
+          if [ "$LATEST_RELEASE_JSON" != "null" ] && [ -n "$LATEST_RELEASE_JSON" ]; then
+            # 提取 release 标签名（格式: openwrt-{version}-{timestamp}）
+            LATEST_RELEASE_TAG_FULL=$(echo "$LATEST_RELEASE_JSON" | grep '"tag_name":' | sed -E 's/.*"tag_name":\s*"([^"]+)".*/\1/' | head -n 1)
+            
+            if [ -n "$LATEST_RELEASE_TAG_FULL" ]; then
+              # 从标签中提取 OpenWrt 版本号（格式: openwrt-24.10.5-20241201-120000）
+              # 提取 openwrt- 之后的第一个版本号部分
+              LATEST_RELEASE_TAG=$(echo "$LATEST_RELEASE_TAG_FULL" | sed -E 's/^openwrt-([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/')
+              
+              if [ -n "$LATEST_RELEASE_TAG" ] && [ "$LATEST_RELEASE_TAG" != "$LATEST_RELEASE_TAG_FULL" ]; then
+                echo "当前仓库最新 release 标签: $LATEST_RELEASE_TAG_FULL"
+                echo "当前仓库最新 release 中的 OpenWrt 版本: $LATEST_RELEASE_TAG"
+                
+                # 使用 sort -V 进行版本比较
+                # sort -V 按版本号排序，最新的在最后
+                SORTED_VERSIONS=$(printf "%s\n%s" "$LATEST_RELEASE_TAG" "$OPENWRT_VERSION_SHORT" | sort -V)
+                HIGHEST_VERSION=$(echo "$SORTED_VERSIONS" | tail -n 1)
+                
+                if [ "$HIGHEST_VERSION" = "$LATEST_RELEASE_TAG" ]; then
+                  # 当前版本 >= 上游版本
+                  if [ "$LATEST_RELEASE_TAG" = "$OPENWRT_VERSION_SHORT" ]; then
+                    NEED_BUILD=false
+                    echo "当前版本 ($LATEST_RELEASE_TAG) == 上游版本 ($OPENWRT_VERSION_SHORT)，跳过构建"
+                  else
+                    NEED_BUILD=false
+                    echo "当前版本 ($LATEST_RELEASE_TAG) > 上游版本 ($OPENWRT_VERSION_SHORT)，跳过构建"
+                  fi
+                else
+                  # 当前版本 < 上游版本
+                  echo "当前版本 ($LATEST_RELEASE_TAG) < 上游版本 ($OPENWRT_VERSION_SHORT)，需要构建"
+                fi
+              else
+                echo "无法从 release 标签 ($LATEST_RELEASE_TAG_FULL) 中提取版本号，将进行构建"
+              fi
+            else
+              echo "未找到有效的 release 标签，将进行构建"
+            fi
+          else
+            echo "未找到当前仓库的 release，将进行首次构建"
+          fi
+        fi
+        
+        # 设置环境变量和输出
         echo "OPENWRT_VERSION=$OPENWRT_VERSION" >> $GITHUB_ENV
         echo "OPENWRT_TAG=$OPENWRT_TAG" >> $GITHUB_ENV
         echo "OPENWRT_VERSION_SHORT=$OPENWRT_VERSION_SHORT" >> $GITHUB_ENV
+        echo "need_build=$NEED_BUILD" >> $GITHUB_OUTPUT
         
         # 保存到文件，供 build-image.sh 使用
         echo "$OPENWRT_TAG" > /tmp/openwrt_tag.txt
         echo "检测到 OpenWrt 版本: $OPENWRT_VERSION"
         echo "版本短格式: $OPENWRT_VERSION_SHORT"
+        echo "是否需要构建: $NEED_BUILD"
+    - name: Skip build notice
+      if: steps.check_release.outputs.need_build != 'true'
+      run: |
+        echo "::notice title=跳过构建::当前仓库版本已是最新或更新，无需构建"
+        echo "上游 OpenWrt 版本: ${{ env.OPENWRT_VERSION_SHORT }}"
     - name: Build firmware with ImageBuilder
+      if: steps.check_release.outputs.need_build == 'true'
       run: |
         bash ./scripts/build-image.sh
     - name: Get build info
+      if: steps.check_release.outputs.need_build == 'true'
       id: build_info
       run: |
         # 获取构建时间戳
@@ -109,8 +174,10 @@ jobs:
           fi
         fi
     - name: Print Disk Space After
+      if: steps.check_release.outputs.need_build == 'true'
       run: df -h
     - name: Organize files
+      if: steps.check_release.outputs.need_build == 'true'
       id: organize
       env:
         OPENWRT_VERSION_SHORT: ${{ env.OPENWRT_VERSION_SHORT }}
@@ -147,12 +214,14 @@ jobs:
         echo "已包含的文件："
         ls -Ahl
     - name: Upload artifact
+      if: steps.check_release.outputs.need_build == 'true'
       uses: actions/upload-artifact@main
       with:
         name: OpenWRT-ImageBuilder-${{ env.OPENWRT_VERSION_SHORT }}-${{ steps.build_info.outputs.build_time }}
         path: ./artifact/
 
     - name: Create release
+      if: steps.check_release.outputs.need_build == 'true'
       id: create_release
       uses: ncipollo/release-action@v1.14.0
       with:
